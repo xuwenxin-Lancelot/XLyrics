@@ -25,9 +25,14 @@ import urllib.parse
 PORT = int(os.environ.get('KUGOU_CDP_PORT', 9225))
 
 
+# Local CDP requests must never go through a proxy: a stale proxy env var
+# (VPN clients rotate ports) would otherwise break the reader outright.
+_DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def _http(path, method='GET', timeout=2):
     req = urllib.request.Request('http://127.0.0.1:%d%s' % (PORT, path), method=method)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with _DIRECT.open(req, timeout=timeout) as r:
         return json.loads(r.read(4 * 1024 * 1024).decode('utf-8', 'replace'))
 
 

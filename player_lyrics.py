@@ -2,7 +2,7 @@
 """Player-specific lyric providers. Network work never runs on the Qt thread."""
 from pathlib import Path
 import base64, ctypes, gzip, html, json, os, re, sqlite3, struct, string, threading, time, unicodedata, hashlib
-import urllib.request, urllib.parse, zlib
+import urllib.request, urllib.parse, urllib.error, zlib
 from functools import lru_cache
 from contextlib import closing
 from app_paths import DATA_DIR as APP_DIR, RESOURCE_DIR
@@ -10,6 +10,9 @@ from lyric_data import LyricLine, parse_lyrics, decode_file, discover_folder, ma
 
 PLAYERS = {'kugou':'酷狗音乐', 'soda':'汽水音乐', 'qq':'QQ音乐', 'netease':'网易云音乐'}
 RESOLVED_TRACKS={}
+# Opener that ignores HTTP(S)_PROXY: used for domestic lyric APIs and for
+# talking to a player's local debug port.
+_DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 class CachePending(ValueError):
     pass
@@ -125,8 +128,15 @@ def read_qrc(path):
 
 def get_json(url, params):
     request=urllib.request.Request(url+'?'+urllib.parse.urlencode(params),headers={'User-Agent':'FloatingLyrics/0.5 (Windows; Kerwin)','Referer':'https://music.163.com/' if '163.com' in url else 'https://www.kugou.com/'})
-    with urllib.request.urlopen(request,timeout=12) as response:
-        return json.loads(response.read(8*1024*1024))
+    # Direct first: these lyric APIs are domestic. A leftover proxy env var
+    # (VPN clients hand out a new port each launch) used to kill every fetch,
+    # because the app keeps the environment it was started with.
+    try:
+        with _DIRECT.open(request,timeout=12) as response:
+            return json.loads(response.read(8*1024*1024))
+    except (OSError,urllib.error.URLError,TimeoutError):
+        with urllib.request.urlopen(request,timeout=12) as response:
+            return json.loads(response.read(8*1024*1024))
 
 def online_krc(data):
     title,artist=data['title'],data['artist']

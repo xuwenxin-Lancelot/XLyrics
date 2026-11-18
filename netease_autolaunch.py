@@ -118,7 +118,7 @@ def _process_running():
         return False
 
 
-def ensure_netease_debug(wait_seconds=45, only_if_running=True):
+def ensure_netease_debug(wait_seconds=75, only_if_running=True):
     """Return (ok, message). Restarts NetEase in CDP debug mode when needed.
 
     `only_if_running` keeps the app from launching NetEase on its own: it will

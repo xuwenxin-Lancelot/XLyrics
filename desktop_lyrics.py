@@ -571,6 +571,11 @@ class Studio(QWidget):
         Only an already-running instance is converted (never launched from
         here), so the app never opens players behind the user's back.
         """
+        attempts = getattr(self, '_netease_attempts', 0)
+        if attempts >= 3:
+            return
+        self._netease_attempts = attempts + 1
+
         def work():
             try:
                 import netease_autolaunch
@@ -585,6 +590,7 @@ class Studio(QWidget):
     @Slot(bool, str)
     def _netease_result(self, ok, msg):
         if ok:
+            self._netease_attempts = 0
             if '切换' in msg:
                 try:
                     self.tray.showMessage('网易云已就绪', '已切换到调试模式，歌词进度可同步了。')
@@ -593,8 +599,13 @@ class Studio(QWidget):
             return
         if msg == '网易云未运行':
             return
-        from PySide6.QtWidgets import QMessageBox
-        QMessageBox.warning(self, '网易云未就绪', msg)
+        # A cold start can take a while; retry quietly instead of blocking the
+        # user with a modal dialog they cannot act on.
+        try:
+            self.tray.showMessage('网易云还在启动', '正在重试连接，稍等片刻即可。')
+        except Exception:
+            pass
+        QTimer.singleShot(15000, self.prepare_netease)
 
     def export_config(self):
         """Export current appearance settings to a shareable .json file."""

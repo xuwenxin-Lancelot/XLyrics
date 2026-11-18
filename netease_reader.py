@@ -68,10 +68,15 @@ SAMPLE = r"""
 """
 
 
+# Local CDP requests must never go through a proxy: a stale proxy env var
+# (VPN clients rotate ports) would otherwise break the reader outright.
+_DIRECT = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+
+
 def _http_json(path, timeout=2):
     url = 'http://127.0.0.1:%d%s' % (PORT, path)
     req = urllib.request.Request(url)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
+    with _DIRECT.open(req, timeout=timeout) as r:
         return json.loads(r.read(4 * 1024 * 1024).decode('utf-8', 'replace'))
 
 

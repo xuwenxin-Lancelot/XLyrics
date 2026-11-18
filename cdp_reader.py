@@ -194,7 +194,15 @@ def to_row(raw, now_ms):
     if str(raw.get('status', '0')) != '1':
         return {'ok': False, 'error': '酷狗尚未播放', 'sampled_unix_ms': now_ms}
     name = (raw.get('filename', '') or '')
-    identity = name.rsplit('.', 1)[0] if '.' in name else name
+    # Only strip a real media extension. The old code did name.rsplit('.', 1)[0],
+    # which ate everything after the last dot — so an artist like "G.E.M.邓紫棋"
+    # lost the artist AND the song ("G.E.M.邓紫棋 - 光年之外" -> "G.E.M").
+    lowered = name.lower()
+    for ext in ('.mp3', '.flac', '.m4a', '.wav', '.ape', '.ogg', '.aac', '.wma'):
+        if lowered.endswith(ext):
+            name = name[:-len(ext)]
+            break
+    identity = name
     if identity.endswith(' - 酷狗音乐'):
         identity = identity[:-len(' - 酷狗音乐')]
     play = str(raw.get('play_status', ''))

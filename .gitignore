@@ -1,0 +1,47 @@
+# Author: Kerwin
+.venv/
+.packaging/
+.build-tools/
+.release/
+_internal/
+__pycache__/
+*.py[cod]
+*.exe
+*.dll
+*.obj
+*.lib
+*.exp
+*.pdb
+*.pid
+appearance.json
+installed.flag
+!installer/installed.flag
+lyric_cache/
+sync_state.*
+sync_events*.jsonl
+live_*.json
+netease_*.json*
+netease_*.txt
+*.log
+.env
+.env.*
+*.pem
+*.key
+*.zip
+*.7z
+*.tmp
+*.bak
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+probe_*.py
+probe_media.ps1
+
+# 本修改版的构建产物
+build*/
+dist*/
+dist_reader/
+
+# 仅忽略根目录由 build_licenses.py 生成的 licenses/，不要影响 third_party/licenses/
+/licenses/

@@ -7,6 +7,17 @@ Windows 桌面透明歌词：逐字变色、3D 透视、柔和放大与动效，
 >
 > 修改者：xuwenxin-Lancelot
 
+## 下载
+
+[**前往 Releases 下载最新版**](https://github.com/xuwenxin-Lancelot/XLyrics/releases/latest)
+
+1. 下载 `XLyrics-v1.0.0-win64.zip`
+2. 解压到任意目录。**整个文件夹都要保留**，不能只拷贝 `X歌词.exe`，否则无法启动。
+3. 双击 `X歌词.exe`
+
+免安装，不需要 Python 或其他运行库。首次运行若出现 Windows SmartScreen 提示，点「更多信息 → 仍要运行」。
+程序会自动把酷狗或网易云切换到调试模式以读取播放进度，切换时会重启该播放器。
+
 ## 本修改版改了什么
 
 **播放进度数据源**

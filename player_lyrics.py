@@ -145,8 +145,13 @@ def online_krc(data):
     # silently returns zero candidates for many tracks (verified: "陈奕迅 富士山下"
     # -> 0 hits, "陈奕迅 - 富士山下" -> 10 hits). Keep the space form as a
     # fallback for the few queries that only answer to it.
+    keywords=[]
+    if artist and title:
+        keywords=[artist+' - '+title, artist+' '+title]
+    elif title:
+        keywords=[title]
     candidates=[]
-    for keyword in (artist+' - '+title, artist+' '+title):
+    for keyword in keywords:
         try:
             result=get_json('https://lyrics.kugou.com/search',
                             dict(ver=1,man='yes',client='pc',keyword=keyword,duration=duration))
@@ -154,7 +159,7 @@ def online_krc(data):
             continue
         candidates=[c for c in (result.get('candidates') or [])
                     if normalized(c.get('song',''))==normalized(title)
-                    and normalized(c.get('singer',''))==normalized(artist)
+                    and (not artist or normalized(c.get('singer',''))==normalized(artist))
                     and (not duration or abs(c.get('duration',0)-duration)<=2500)]
         if candidates:
             break
@@ -176,7 +181,7 @@ def soda_duration_matches(track,data):
     return any(length>0 and abs(length-duration)<=2500 for length in lengths)
 
 def fetch(player,data):
-    title,artist=data.get('title',''),data.get('artist','')
+    title,artist=data.get('title') or '',data.get('artist') or ''
     if player=='soda':
         from soda_cache import records
         database=Path(os.environ.get('APPDATA',''))/'SodaMusic/LunaCacheV2/entries.db'

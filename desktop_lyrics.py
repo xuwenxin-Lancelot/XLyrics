@@ -984,6 +984,7 @@ class Studio(QWidget):
             self.track_artist.setText(artist if sep else '')
             self.transcript.clear()
             self.next_scan = 0
+            self.kugou_online_at = None
             self.set_content('正在读取歌词…', '')
         if self.appearance.player!='kugou' and self.current_file is None:
             self.provider.request(self.appearance.player,dict(data))
@@ -1005,6 +1006,28 @@ class Studio(QWidget):
                 self.load_file(path)
             else:
                 self.set_content('暂无本地歌词', '')
+                # KuGou only caches a KRC after its own lyrics panel opens once.
+                # After a short grace period fall back to the online lyric
+                # service, so a KRC that shows up late still takes priority.
+                if getattr(self, 'kugou_online_at', None) is None:
+                    self.kugou_online_at = now + 2.5
+                elif now >= self.kugou_online_at:
+                    artist, sep, song = identity.partition(' - ')
+                    payload = dict(data)
+                    payload['artist'] = artist if sep else ''
+                    payload['title'] = (song or identity) if sep else identity
+                    self.provider.request('kugou', payload)
+                    online = self.provider.snapshot()
+                    if online and online.get('key') == ('kugou', identity):
+                        if online.get('ok'):
+                            self.lines = online['lines']
+                            self.lyric_source = online['source']
+                            self.offset = 0
+                            self.index = -2
+                            self.current_file = Path('player-lyrics') / 'kugou'
+                            self.transcript.setPlainText('\n'.join(line.text for line in self.lines))
+                        else:
+                            self.footer.setText(online.get('error', '暂无可用歌词'))
         position, duration = int(self.player_clock.position(now)) if progress_ok else 0, max(0,round(data.get('duration_ms',0)))
         state = '已暂停' if data['state'] == 'paused' else '播放中' if data['state'] == 'playing' else '已连接'
         self.clock.setText(f'{position // 60000:02d}:{position // 1000 % 60:02d}  /  {duration // 60000:02d}:{duration // 1000 % 60:02d}' if progress_ok else '— : —  /  '+(f'{duration // 60000:02d}:{duration // 1000 % 60:02d}' if duration else '— : —'))

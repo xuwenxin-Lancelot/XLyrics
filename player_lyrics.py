@@ -140,10 +140,26 @@ def get_json(url, params):
 
 def online_krc(data):
     title,artist=data['title'],data['artist']
-    result=get_json('https://lyrics.kugou.com/search',dict(ver=1,man='yes',client='pc',keyword=artist+' '+title,duration=int(data.get('duration_ms',0))))
-    candidates=[c for c in result.get('candidates',[]) if normalized(c.get('song',''))==normalized(title) and normalized(c.get('singer',''))==normalized(artist) and (not data.get('duration_ms') or abs(c.get('duration',0)-data['duration_ms'])<=2500)]
+    duration=int(data.get('duration_ms',0) or 0)
+    # KuGou's lyric search expects "artist - title". Joining with a plain space
+    # silently returns zero candidates for many tracks (verified: "陈奕迅 富士山下"
+    # -> 0 hits, "陈奕迅 - 富士山下" -> 10 hits). Keep the space form as a
+    # fallback for the few queries that only answer to it.
+    candidates=[]
+    for keyword in (artist+' - '+title, artist+' '+title):
+        try:
+            result=get_json('https://lyrics.kugou.com/search',
+                            dict(ver=1,man='yes',client='pc',keyword=keyword,duration=duration))
+        except (OSError,urllib.error.URLError,TimeoutError):
+            continue
+        candidates=[c for c in (result.get('candidates') or [])
+                    if normalized(c.get('song',''))==normalized(title)
+                    and normalized(c.get('singer',''))==normalized(artist)
+                    and (not duration or abs(c.get('duration',0)-duration)<=2500)]
+        if candidates:
+            break
     if not candidates:raise ValueError('没有歌名、歌手和时长均匹配的在线歌词')
-    candidate=min(candidates,key=lambda c:abs(c.get('duration',0)-data.get('duration_ms',0)))
+    candidate=min(candidates,key=lambda c:abs(c.get('duration',0)-duration))
     result=get_json('https://lyrics.kugou.com/download',dict(ver=1,client='pc',id=candidate['id'],accesskey=candidate['accesskey'],fmt='krc',charset='utf8'))
     raw=base64.b64decode(result['content'])
     from lyric_data import KRC_KEY

@@ -150,21 +150,31 @@ def online_krc(data):
         keywords=[artist+' - '+title, artist+' '+title]
     elif title:
         keywords=[title]
-    candidates=[]
+    # Version tags such as "(DJ氛围版)" / "(Live)" / "(Remix)" often exist only
+    # in the player's title, while the lyric entry keeps the bare song name.
+    # Keep the bare name as a second, weaker candidate title.
+    base=re.sub(r'\s*[\(（][^\)）]*[\)）]\s*$','',title).strip() if title else ''
+    variants=[v for v in (title,base) if v]
+    if artist and base and base!=title:
+        keywords.insert(1,artist+' - '+base)
+    wanted={normalized(v) for v in variants}
+    pool=[]
     for keyword in keywords:
         try:
             result=get_json('https://lyrics.kugou.com/search',
                             dict(ver=1,man='yes',client='pc',keyword=keyword,duration=duration))
         except (OSError,urllib.error.URLError,TimeoutError):
             continue
-        candidates=[c for c in (result.get('candidates') or [])
-                    if normalized(c.get('song',''))==normalized(title)
+        pool.extend(c for c in (result.get('candidates') or [])
+                    if normalized(c.get('song','')) in wanted
                     and (not artist or normalized(c.get('singer',''))==normalized(artist))
-                    and (not duration or abs(c.get('duration',0)-duration)<=2500)]
-        if candidates:
+                    and (not duration or abs(c.get('duration',0)-duration)<=2500))
+        if pool:
             break
-    if not candidates:raise ValueError('没有歌名、歌手和时长均匹配的在线歌词')
-    candidate=min(candidates,key=lambda c:abs(c.get('duration',0)-duration))
+    if not pool:raise ValueError('没有歌名、歌手和时长均匹配的在线歌词')
+    # An exact title match always wins; a bare-name match only ties on duration.
+    candidate=min(pool,key=lambda c:(normalized(c.get('song',''))!=normalized(title),
+                                     abs(c.get('duration',0)-duration)))
     result=get_json('https://lyrics.kugou.com/download',dict(ver=1,client='pc',id=candidate['id'],accesskey=candidate['accesskey'],fmt='krc',charset='utf8'))
     raw=base64.b64decode(result['content'])
     from lyric_data import KRC_KEY

@@ -1060,7 +1060,11 @@ class Studio(QWidget):
                          mode=self.appearance.mode, line_count=self.appearance.line_count,
                          timing_source=timing,diagnosed_unix_ms=round(time.time()*1000),
                          stages=dict(song=bool(data.get('ok') and now-received<=4),progress=bool(data.get('ok') and data.get('progress_ok',True) and now-received<=4),lyrics=bool(self.current_file)),
-                         lyric_error=lyric_error,reader_age_ms=round(max(0,now-received)*1000))
+                         lyric_error=lyric_error,reader_age_ms=round(max(0,now-received)*1000),
+                         topmost_repairs=getattr(self.overlay,'topmost_repairs',0),
+                         guard_ticks=getattr(self.overlay,'guard_ticks',0),
+                         guard_skips=getattr(self.overlay,'guard_skips',0),
+                         overlay_is_visible=self.overlay.isVisible())
             try:
                 temp = BASE / 'sync_state.tmp'
                 temp.write_text(json.dumps(debug, ensure_ascii=False, indent=2), encoding='utf-8')

@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 import time
 from functools import lru_cache
-from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, Signal
+from PySide6.QtCore import QPoint, QPointF, QRectF, Qt, QTimer, Signal
 from PySide6.QtGui import (QColor, QFont, QFontMetricsF, QLinearGradient, QPainter,
                           QPainterPath, QPen, QPolygonF, QTextLayout, QTextOption, QTransform,
                           QImage, QBitmap, QRegion)
@@ -182,6 +182,53 @@ class LyricCanvas(QWidget):
             self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
             self.apply_flags()
             self.setCursor(Qt.CursorShape.SizeAllCursor)
+            self.topmost_repairs = 0
+            # Closing another app (WeChat, a game launcher…) can drop the
+            # topmost bit or hide the window underneath a maximised window.
+            # Nothing in the Qt API restores it, so poll cheaply and re-assert.
+            self.topmost_guard = QTimer(self)
+            self.topmost_guard.setInterval(2000)
+            self.topmost_guard.timeout.connect(self.ensure_topmost)
+            self.topmost_guard.start()
+
+    def ensure_topmost(self):
+        """Re-assert topmost/visibility if Windows quietly dropped them.
+
+        The user's intent lives in appearance.visible; Qt's own isVisible() can
+        desync after the shell hides the window, so it must not gate recovery.
+        """
+        if self.preview or not self.appearance.topmost or not self.appearance.visible:
+            self.guard_skips = getattr(self, 'guard_skips', 0) + 1
+            return
+        self.guard_ticks = getattr(self, 'guard_ticks', 0) + 1
+        try:
+            import ctypes
+            user32 = ctypes.windll.user32
+            user32.GetWindowLongW.restype = ctypes.c_long
+            # HWND_TOPMOST must be passed as a full-width pointer: a plain -1
+            # is marshalled as 32-bit and rejected with ERROR_INVALID_WINDOW_HANDLE,
+            # which silently turned every earlier "repair" into a no-op.
+            user32.SetWindowPos.argtypes = [ctypes.c_void_p, ctypes.c_void_p,
+                                            ctypes.c_int, ctypes.c_int,
+                                            ctypes.c_int, ctypes.c_int, ctypes.c_uint]
+            user32.SetWindowPos.restype = ctypes.c_int
+            hwnd = int(self.winId())
+            if not self.isVisible():
+                self.show()
+            GWL_EXSTYLE, WS_EX_TOPMOST = -20, 0x00000008
+            style = user32.GetWindowLongW(ctypes.c_void_p(hwnd), GWL_EXSTYLE)
+            shown = bool(user32.IsWindowVisible(ctypes.c_void_p(hwnd)))
+            if shown and (style & WS_EX_TOPMOST):
+                return
+            SWP_NOSIZE, SWP_NOMOVE = 0x0001, 0x0002
+            SWP_NOACTIVATE, SWP_SHOWWINDOW = 0x0010, 0x0040
+            if user32.SetWindowPos(ctypes.c_void_p(hwnd), ctypes.c_void_p(-1),
+                                   0, 0, 0, 0,
+                                   SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_SHOWWINDOW):
+                self.topmost_repairs += 1
+                self.sync_backdrop()
+        except Exception:
+            return
 
     def apply_flags(self):
         if self.preview:
